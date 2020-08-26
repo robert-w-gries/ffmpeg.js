@@ -10,6 +10,15 @@ COMMON_FILTERS = aresample scale crop overlay hstack vstack
 COMMON_DEMUXERS = matroska ogg mov mp3 wav image2 concat
 COMMON_DECODERS = vp8 h264 vorbis opus mp3 aac pcm_s16le mjpeg png
 
+LIBS = \
+	build/ffmpeg/libavutil/libavutil.a \
+    build/ffmpeg/libavcodec/libavcodec.a \
+    build/ffmpeg/libavfilter/libavfilter.a \
+    build/ffmpeg/libavformat/libavformat.a
+
+DECODERS = mp3
+FFMPEG = build/ffmpeg/ffmpeg
+
 WEBM_MUXERS = webm ogg null
 WEBM_ENCODERS = libvpx_vp8 libopus
 FFMPEG_WEBM_BC = build/ffmpeg-webm/ffmpeg.bc
@@ -26,27 +35,24 @@ MP4_SHARED_DEPS = \
 	build/lame/dist/lib/libmp3lame.so \
 	build/x264/dist/lib/libx264.so
 
-all: webm mp4
-webm: ffmpeg-webm.js ffmpeg-worker-webm.js
-mp4: ffmpeg-mp4.js ffmpeg-worker-mp4.js
+all: ffmpeg
+ffmpeg: ffmpeg.js ffmpeg-worker.js
 
 clean: clean-js \
-	clean-opus clean-libvpx clean-ffmpeg-webm \
-	clean-lame clean-x264 clean-ffmpeg-mp4
+	clean-opus clean-libvpx clean-ffmpeg \
+	clean-lame clean-x264
 clean-js:
 	rm -f ffmpeg*.js
 clean-opus:
 	cd build/opus && git clean -xdf
 clean-libvpx:
 	cd build/libvpx && git clean -xdf
-clean-ffmpeg-webm:
-	cd build/ffmpeg-webm && git clean -xdf
 clean-lame:
 	cd build/lame && git clean -xdf
 clean-x264:
 	cd build/x264 && git clean -xdf
-clean-ffmpeg-mp4:
-	cd build/ffmpeg-mp4 && git clean -xdf
+clean-ffmpeg:
+	cd build/ffmpeg && git clean -xdf
 
 build/opus/configure:
 	cd build/opus && ./autogen.sh
@@ -158,93 +164,49 @@ FFMPEG_COMMON_ARGS = \
 	--disable-os2threads \
 	--disable-debug \
 	--disable-stripping \
-	--disable-safe-bitstream-reader \
 	\
-	--disable-all \
-	--enable-ffmpeg \
-	--enable-avcodec \
-	--enable-avformat \
-	--enable-avfilter \
-	--enable-swresample \
-	--enable-swscale \
-	--disable-network \
-	--disable-d3d11va \
-	--disable-dxva2 \
-	--disable-vaapi \
-	--disable-vdpau \
-	$(addprefix --enable-decoder=,$(COMMON_DECODERS)) \
-	$(addprefix --enable-demuxer=,$(COMMON_DEMUXERS)) \
-	--enable-protocol=file \
-	$(addprefix --enable-filter=,$(COMMON_FILTERS)) \
-	--disable-bzlib \
-	--disable-iconv \
-	--disable-libxcb \
-	--disable-lzma \
-	--disable-sdl2 \
-	--disable-securetransport \
-	--disable-xlib \
-	--enable-zlib
+    --disable-everything \
+    --disable-network \
+    --disable-autodetect \
+    --enable-small \
+    --enable-decoder=mp3 \
+    --enable-protocol=file
 
-build/ffmpeg-webm/ffmpeg.bc: $(WEBM_SHARED_DEPS)
-	cd build/ffmpeg-webm && \
-	EM_PKG_CONFIG_PATH=$(FFMPEG_WEBM_PC_PATH) emconfigure ./configure \
+build/ffmpeg/ffmpeg:
+	cd build/ffmpeg && \
+	emconfigure ./configure \
 		$(FFMPEG_COMMON_ARGS) \
-		$(addprefix --enable-encoder=,$(WEBM_ENCODERS)) \
-		$(addprefix --enable-muxer=,$(WEBM_MUXERS)) \
-		--enable-libopus \
-		--enable-libvpx \
-		--extra-cflags="-s USE_ZLIB=1 -I../libvpx/dist/include" \
-		--extra-ldflags="-L../libvpx/dist/lib" \
+		$(addprefix --enable-decoder=,$(DECODERS)) \
 		&& \
-	emmake make -j && \
-	cp ffmpeg ffmpeg.bc
-
-build/ffmpeg-mp4/ffmpeg.bc: $(MP4_SHARED_DEPS)
-	cd build/ffmpeg-mp4 && \
-	EM_PKG_CONFIG_PATH=$(FFMPEG_MP4_PC_PATH) emconfigure ./configure \
-		$(FFMPEG_COMMON_ARGS) \
-		$(addprefix --enable-encoder=,$(MP4_ENCODERS)) \
-		$(addprefix --enable-muxer=,$(MP4_MUXERS)) \
-		--enable-gpl \
-		--enable-libmp3lame \
-		--enable-libx264 \
-		--extra-cflags="-s USE_ZLIB=1 -I../lame/dist/include" \
-		--extra-ldflags="-L../lame/dist/lib" \
-		&& \
-	emmake make -j && \
-	cp ffmpeg ffmpeg.bc
+	emmake make -j
 
 EMCC_COMMON_ARGS = \
-	-O3 \
+	-Os \
 	--closure 1 \
-	--memory-init-file 0 \
-	-s WASM=0 \
-	-s WASM_ASYNC_COMPILATION=0 \
-	-s ASSERTIONS=0 \
-	-s EXIT_RUNTIME=1 \
-	-s NODEJS_CATCH_EXIT=0 \
-	-s NODEJS_CATCH_REJECTION=0 \
-	-s TOTAL_MEMORY=67108864 \
-	-lnodefs.js -lworkerfs.js \
-	--pre-js $(PRE_JS) \
+    -s MODULARIZE=1 \
+	-s EXPORT_ES6=1 \
+	-s USE_ES6_IMPORT_META=0 \
+	-s SINGLE_FILE=1 \
+	-s ENVIRONMENT=web \
+	-s ALLOW_MEMORY_GROWTH=1 \
+    -s MALLOC=emmalloc \
+    -s EXPORTED_FUNCTIONS='[ \
+		"_avcodec_register_all", \
+		"_avcodec_find_decoder_by_name", \
+		"_avcodec_alloc_context3", \
+		"_avcodec_open2", \
+		"_av_init_packet", \
+		"_av_frame_alloc", \
+		"_av_packet_from_data", \
+		"_avcodec_decode_video2", \
+		"_avcodec_flush_buffers"]' \
+    -s EXTRA_EXPORTED_RUNTIME_METHODS='["FS", "ccall", "getValue", "setValue", "writeArrayToMemory"]' \
 	-o $@
 
-ffmpeg-webm.js: $(FFMPEG_WEBM_BC) $(PRE_JS) $(POST_JS_SYNC)
-	emcc $(FFMPEG_WEBM_BC) $(WEBM_SHARED_DEPS) \
-		--post-js $(POST_JS_SYNC) \
+ffmpeg.js: $(FFMPEG)
+	emcc $(LIBS) \
 		$(EMCC_COMMON_ARGS)
 
-ffmpeg-worker-webm.js: $(FFMPEG_WEBM_BC) $(PRE_JS) $(POST_JS_WORKER)
-	emcc $(FFMPEG_WEBM_BC) $(WEBM_SHARED_DEPS) \
-		--post-js $(POST_JS_WORKER) \
+ffmpeg-worker.js: $(FFMPEG)
+	emcc $(LIBS) \
 		$(EMCC_COMMON_ARGS)
-
-ffmpeg-mp4.js: $(FFMPEG_MP4_BC) $(PRE_JS) $(POST_JS_SYNC)
-	emcc $(FFMPEG_MP4_BC) $(MP4_SHARED_DEPS) \
-		--post-js $(POST_JS_SYNC) \
-		$(EMCC_COMMON_ARGS) -O2
-
-ffmpeg-worker-mp4.js: $(FFMPEG_MP4_BC) $(PRE_JS) $(POST_JS_WORKER)
-	emcc $(FFMPEG_MP4_BC) $(MP4_SHARED_DEPS) \
-		--post-js $(POST_JS_WORKER) \
-		$(EMCC_COMMON_ARGS) -O2
