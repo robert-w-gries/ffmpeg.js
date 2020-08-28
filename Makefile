@@ -182,7 +182,7 @@ build/ffmpeg/ffmpeg:
 	emmake make -j
 
 EMCC_COMMON_ARGS = \
-	--closure=1 \
+	--closure 1 \
 	-Os \
 	-s SINGLE_FILE=1 \
 	-s MODULARIZE=1 \

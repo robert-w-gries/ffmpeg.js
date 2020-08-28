@@ -5,20 +5,57 @@ extern "C" {
 
 using namespace emscripten;
 
+void printf_wrapper(const char *s) {
+    printf("%s\n", s);
+}
+
 class AVCodecWrapper {
 public:
-    AVCodecWrapper(AVCodec codec) : codec(codec) {}
-    AVCodec codec;
+    AVCodecWrapper(std::string decoder_name) {
+        codec = avcodec_find_decoder_by_name(decoder_name.c_str());
+        if (!codec) {
+            printf_wrapper("no mp3 decoder");
+        }
+
+        packet = av_packet_alloc();
+        if (!packet) {
+            printf_wrapper("could not allocate packet");
+        }
+
+        parser = av_parser_init(codec->id);
+        if (!parser) {
+            printf_wrapper("Parser not found");
+        }
+
+        context = avcodec_alloc_context3(codec);
+        if (!context) {
+            printf_wrapper("Error while creating avcodec context");
+        }
+
+        int ret = avcodec_open2(context, codec, 0);
+        if (ret < 0) {
+            printf_wrapper("Could not open codec");
+        }
+    }
+    ~AVCodecWrapper() {
+        avcodec_free_context(&context);
+        av_parser_close(parser);
+        av_packet_free(&packet);
+        av_frame_free(&frame);
+    }
+
+    void decode(const uint8_t *inBuffer, const uint8_t *outBuffer) {
+
+    }
+private:
+    AVCodec *codec;
+    AVPacket *packet;
+    AVFrame *frame;
+    AVCodecContext *context;
+    AVCodecParserContext *parser;
 };
 
 EMSCRIPTEN_BINDINGS(my_module) {
     class_<AVCodecWrapper>("AVCodecWrapper")
-        .constructor<AVCodec>()
-        .property("codec", &AVCodecWrapper::codec);
-
-    function("avcodec_find_decoder_by_name", &avcodec_find_decoder_by_name, allow_raw_pointers());
-    function("avcodec_alloc_context3", &avcodec_alloc_context3, allow_raw_pointers());
-    function("avcodec_open2", &avcodec_open2, allow_raw_pointers());
-    function("av_packet_alloc", &av_packet_alloc, allow_raw_pointers());
-    function("av_frame_alloc", &av_frame_alloc, allow_raw_pointers());
+        .constructor<std::string>();
 }
