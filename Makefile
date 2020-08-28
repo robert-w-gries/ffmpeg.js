@@ -18,6 +18,7 @@ LIBS = \
 
 DECODERS = mp3
 FFMPEG = build/ffmpeg/ffmpeg
+FFMPEG_WRAPPER = build/bindings.bc
 
 WEBM_MUXERS = webm ogg null
 WEBM_ENCODERS = libvpx_vp8 libopus
@@ -36,7 +37,7 @@ MP4_SHARED_DEPS = \
 	build/x264/dist/lib/libx264.so
 
 all: ffmpeg
-ffmpeg: ffmpeg.js ffmpeg-worker.js
+ffmpeg: ffmpeg.js
 
 clean: clean-js \
 	clean-opus clean-libvpx clean-ffmpeg \
@@ -181,32 +182,17 @@ build/ffmpeg/ffmpeg:
 	emmake make -j
 
 EMCC_COMMON_ARGS = \
+	--closure=1 \
 	-Os \
-	--closure 1 \
-    -s MODULARIZE=1 \
+	-s SINGLE_FILE=1 \
+	-s MODULARIZE=1 \
 	-s EXPORT_ES6=1 \
 	-s USE_ES6_IMPORT_META=0 \
-	-s SINGLE_FILE=1 \
 	-s ENVIRONMENT=web \
 	-s ALLOW_MEMORY_GROWTH=1 \
     -s MALLOC=emmalloc \
-    -s EXPORTED_FUNCTIONS='[ \
-		"_avcodec_register_all", \
-		"_avcodec_find_decoder_by_name", \
-		"_avcodec_alloc_context3", \
-		"_avcodec_open2", \
-		"_av_init_packet", \
-		"_av_frame_alloc", \
-		"_av_packet_from_data", \
-		"_avcodec_decode_video2", \
-		"_avcodec_flush_buffers"]' \
-    -s EXTRA_EXPORTED_RUNTIME_METHODS='["FS", "ccall", "getValue", "setValue", "writeArrayToMemory"]' \
+	-Ibuild/ffmpeg/ \
 	-o $@
 
 ffmpeg.js: $(FFMPEG)
-	emcc $(LIBS) \
-		$(EMCC_COMMON_ARGS)
-
-ffmpeg-worker.js: $(FFMPEG)
-	emcc $(LIBS) \
-		$(EMCC_COMMON_ARGS)
+	emcc --bind $(LIBS) build/bindings.cpp $(EMCC_COMMON_ARGS)
