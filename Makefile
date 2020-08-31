@@ -2,10 +2,6 @@
 # You need emsdk environment installed and activated, see:
 # <https://kripken.github.io/emscripten-site/docs/getting_started/downloads.html>.
 
-PRE_JS = build/pre.js
-POST_JS_SYNC = build/post-sync.js
-POST_JS_WORKER = build/post-worker.js
-
 COMMON_FILTERS = aresample scale crop overlay hstack vstack
 COMMON_DEMUXERS = matroska ogg mov mp3 wav image2 concat
 COMMON_DECODERS = vp8 h264 vorbis opus mp3 aac pcm_s16le mjpeg png
@@ -14,11 +10,11 @@ LIBS = \
 	build/ffmpeg/libavutil/libavutil.a \
     build/ffmpeg/libavcodec/libavcodec.a \
     build/ffmpeg/libavfilter/libavfilter.a \
-    build/ffmpeg/libavformat/libavformat.a
+    build/ffmpeg/libavformat/libavformat.a \
+	build/ffmpeg/libswresample/libswresample.a
 
 DECODERS = mp3
-FFMPEG = build/ffmpeg/ffmpeg
-FFMPEG_WRAPPER = build/bindings.bc
+FFMPEG = build/ffmpeg/libavcodec/libavcodec.a
 
 WEBM_MUXERS = webm ogg null
 WEBM_ENCODERS = libvpx_vp8 libopus
@@ -165,15 +161,18 @@ FFMPEG_COMMON_ARGS = \
 	--disable-os2threads \
 	--disable-debug \
 	--disable-stripping \
+	--disable-programs \
 	\
     --disable-everything \
     --disable-network \
     --disable-autodetect \
     --enable-small \
     --enable-decoder=mp3 \
+    --enable-parser=mp3 \
+    --enable-demuxer=mp3 \
     --enable-protocol=file
 
-build/ffmpeg/ffmpeg:
+build/ffmpeg/libavcodec/libavcodec.a:
 	cd build/ffmpeg && \
 	emconfigure ./configure \
 		$(FFMPEG_COMMON_ARGS) \
