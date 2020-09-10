@@ -187,7 +187,7 @@ EMCC_COMMON_ARGS = \
 	-s MODULARIZE=1 \
 	-s EXPORT_ES6=1 \
 	-s USE_ES6_IMPORT_META=0 \
-	-s ENVIRONMENT=web \
+	-s ENVIRONMENT=web,worker \
 	-s ALLOW_MEMORY_GROWTH=1 \
     -s MALLOC=emmalloc \
 	-Ibuild/ffmpeg/ \

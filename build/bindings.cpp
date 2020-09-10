@@ -68,6 +68,7 @@ public:
     }
 
     val decode(const val &typedArray) {
+        out_buffer.clear();
         AVPacket *packet = av_packet_alloc();
         if (!packet) {
             printf_wrapper("could not allocate packet");
@@ -90,8 +91,11 @@ public:
                 decode_packet(packet);
             }
         }
-        printf("Sample rate = %d\n", context->sample_rate);
-        printf("Channels = %d\n", context->channels);
+
+        // flush the buffers
+        decode_packet(NULL);
+        avcodec_flush_buffers(context);
+
         av_packet_free(&packet);
         return val(typed_memory_view(out_buffer.size(), out_buffer.data()));
     }
@@ -148,7 +152,6 @@ private:
                 }
             }*/
         }
-
         av_frame_free(&frame);
     }
 
