@@ -172,26 +172,28 @@ FFMPEG_COMMON_ARGS = \
     --enable-demuxer=mp3 \
     --enable-protocol=file
 
+EMCC_COMMON_ARGS = \
+	-s ALLOW_MEMORY_GROWTH=1 \
+	-s INVOKE_RUN=0 \
+	-s FILESYSTEM=0
+
 build/ffmpeg/libavcodec/libavcodec.a:
 	cd build/ffmpeg && \
 	emconfigure ./configure \
 		$(FFMPEG_COMMON_ARGS) \
 		$(addprefix --enable-decoder=,$(DECODERS)) \
 		&& \
-	emmake make -j
+	emmake make -j $(EMCC_COMMON_ARGS)
 
-EMCC_COMMON_ARGS = \
+EMCC_BIND_ARGS = \
 	--closure 1 \
 	-Os \
+	-Ibuild/ffmpeg/ \
 	-s SINGLE_FILE=1 \
 	-s MODULARIZE=1 \
 	-s EXPORT_ES6=1 \
-	-s USE_ES6_IMPORT_META=0 \
 	-s ENVIRONMENT=web,worker \
-	-s ALLOW_MEMORY_GROWTH=1 \
-    -s MALLOC=emmalloc \
-	-Ibuild/ffmpeg/ \
 	-o $@
 
 ffmpeg.js: $(FFMPEG)
-	emcc --bind $(LIBS) build/bindings.cpp $(EMCC_COMMON_ARGS)
+	emcc --bind $(LIBS) build/bindings.cpp $(EMCC_COMMON_ARGS) $(EMCC_BIND_ARGS)

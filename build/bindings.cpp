@@ -22,17 +22,6 @@ std::vector<uint8_t> vecFromArray(const val &arr) {
   return vec;
 }
 
-static int check_sample_fmt(AVCodec *codec, enum AVSampleFormat sample_fmt)
-{
-    const enum AVSampleFormat *p = codec->sample_fmts;
-    while (*p != AV_SAMPLE_FMT_NONE) {
-        if (*p == sample_fmt)
-            return 1;
-        p++;
-    }
-    return 0;
-}
-
 class AVCodecWrapper {
 public:
     AVCodecWrapper() {
@@ -65,6 +54,10 @@ public:
         avcodec_free_context(&context);
         av_parser_close(parser);
         swr_free(&swr);
+    }
+
+    double getBitRate() {
+        return static_cast<double>(context->bit_rate);
     }
 
     val decode(const val &typedArray) {
@@ -142,15 +135,6 @@ private:
                 auto byte = *(buffer + i);
                 out_buffer.push_back(byte);
             }
-            /*int size = av_get_bytes_per_sample(context->sample_fmt);
-            for (int i = 0; i < frame->nb_samples; i++) {
-                for (int ch = 0; ch < context->channels; ch++) {
-                    for (int pos = 0; pos < size; pos++) {
-                        auto byte = *(frame->data[ch] + (size*i) + pos);
-                        out_buffer.push_back(byte);
-                    }
-                }
-            }*/
         }
         av_frame_free(&frame);
     }
@@ -160,7 +144,6 @@ private:
         av_opt_set_int(swr, "out_channel_count", 1, 0);
         av_opt_set_int(swr, "in_channel_layout",  context->channel_layout, 0);
         av_opt_set_int(swr, "out_channel_layout", AV_CH_LAYOUT_MONO, 0);
-        printf("SAMPLE RATE INPUT = %d\n", context->sample_rate);
         av_opt_set_int(swr, "in_sample_rate", context->sample_rate, 0);
         av_opt_set_int(swr, "out_sample_rate", 44100, 0);
         av_opt_set_sample_fmt(swr, "in_sample_fmt",  context->sample_fmt, 0);
@@ -175,5 +158,6 @@ private:
 EMSCRIPTEN_BINDINGS(my_module) {
     class_<AVCodecWrapper>("AVCodecWrapper")
         .constructor<>()
-        .function("decode", &AVCodecWrapper::decode, allow_raw_pointers());
+        .function("decode", &AVCodecWrapper::decode, allow_raw_pointers())
+        .function("getBitRate", &AVCodecWrapper::getBitRate);
 }
